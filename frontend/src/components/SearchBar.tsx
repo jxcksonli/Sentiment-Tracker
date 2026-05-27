@@ -1,40 +1,24 @@
-import { useCallback, useRef, useState } from "react";
-import { searchTopic } from "../api";
+import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./SearchBar.css";
 
-interface SearchBarProps {
-  onSearchResult?: (message: string) => void;
-}
-
-export default function SearchBar({ onSearchResult }: SearchBarProps) {
+export default function SearchBar() {
   const [query, setQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const runSearch = useCallback(
-    async (value: string) => {
-      const trimmed = value.trim();
-      if (!trimmed) return;
-      if (trimmed.length === 1) {
-        onSearchResult?.("Keep going — add one more character.");
-        return;
-      }
-
-      setQuery(trimmed);
-      setIsSearching(true);
-
-      try {
-        const result = await searchTopic(trimmed);
-        onSearchResult?.(result.message);
-      } catch {
-        onSearchResult?.("Something went wrong. Is the backend running?");
-      } finally {
-        setIsSearching(false);
-      }
-    },
-    [onSearchResult],
-  );
+  const runSearch = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    if (trimmed.length === 1) {
+      setError("Keep going — add one more character.");
+      return;
+    }
+    setError(null);
+    navigate(`/search?q=${encodeURIComponent(trimmed)}`);
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -68,17 +52,22 @@ export default function SearchBar({ onSearchResult }: SearchBarProps) {
           aria-label="Search topics"
           autoComplete="off"
         />
-        {isSearching && <span className="search-bar__spinner" aria-hidden="true" />}
 
         <button
           type="button"
           className="search-bar__button"
           onClick={() => runSearch(query)}
-          disabled={isSearching || query.trim().length === 0}
+          disabled={query.trim().length === 0}
         >
           Search
         </button>
       </div>
+
+      {error && (
+        <div className="search-bar__error" role="status">
+          {error}
+        </div>
+      )}
     </div>
   );
 }

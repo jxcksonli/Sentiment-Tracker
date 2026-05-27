@@ -1,10 +1,9 @@
-import { useState } from "react";
-import SearchBar from "./components/SearchBar";
+import { Route, Routes } from "react-router-dom";
+import HomePage from "./pages/HomePage";
+import ResultsPage from "./pages/ResultsPage";
 import "./App.css";
 
 export default function App() {
-  const [resultMessage, setResultMessage] = useState<string | null>(null);
-
   return (
     <div className="app">
       <div className="app__glow app__glow--sun" aria-hidden="true" />
@@ -102,13 +101,10 @@ export default function App() {
           </p>
         </header>
 
-        <SearchBar onSearchResult={setResultMessage} />
-
-        {resultMessage && (
-          <p className="app__result" role="status">
-            {resultMessage}
-          </p>
-        )}
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/search" element={<ResultsPage />} />
+        </Routes>
 
         <footer className="app__footer">
           <span className="app__footer-main">© 2026 Sentiment Tracker</span>
