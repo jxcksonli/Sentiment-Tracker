@@ -1,33 +1,22 @@
-export interface SearchSuggestion {
-  label: string;
-  value: string;
-  category?: string | null;
+export type SentimentLabel = "positive" | "neutral" | "negative";
+
+export interface KeywordBubble {
+  word: string;
+  count: number;
+  sentiment: SentimentLabel;
+  score?: number;
 }
 
-export interface SearchSuggestionsResponse {
-  query: string;
-  suggestions: SearchSuggestion[];
-}
-
-export interface SearchResponse {
-  query: string;
-  message: string;
-}
+/**
+ * NOTE: Backend is still being implemented.
+ * This type supports both the current placeholder response (message)
+ * and the future bubble-cloud response (keywords).
+ */
+export type SearchResponse =
+  | { query: string; message: string }
+  | { query: string; keywords: KeywordBubble[] };
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
-
-export async function fetchSuggestions(
-  query: string,
-  signal?: AbortSignal,
-): Promise<SearchSuggestion[]> {
-  const params = new URLSearchParams({ q: query });
-  const res = await fetch(`${API_BASE}/api/search/suggestions?${params}`, {
-    signal,
-  });
-  if (!res.ok) throw new Error("Failed to fetch suggestions");
-  const data: SearchSuggestionsResponse = await res.json();
-  return data.suggestions;
-}
 
 export async function searchTopic(query: string): Promise<SearchResponse> {
   const res = await fetch(`${API_BASE}/api/search`, {

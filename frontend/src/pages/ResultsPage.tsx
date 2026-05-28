@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { searchTopic } from "../api";
+import { searchTopic, type KeywordBubble } from "../api";
+import WordBubbleCloud from "../components/WordBubbleCloud";
 
 export default function ResultsPage() {
   const [params] = useSearchParams();
   const query = (params.get("q") ?? "").trim();
 
   const [message, setMessage] = useState<string | null>(null);
+  const [keywords, setKeywords] = useState<null | KeywordBubble[]>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const validationMessage = useMemo(() => {
@@ -25,15 +27,25 @@ export default function ResultsPage() {
     async function run() {
       if (validationMessage) {
         setMessage(validationMessage);
+        setKeywords(null);
         return;
       }
 
       setIsLoading(true);
       setMessage(null);
+      setKeywords(null);
 
       try {
         const res = await searchTopic(query);
-        if (!cancelled) setMessage(res.message);
+        if (cancelled) return;
+
+        if ("keywords" in res) {
+          setKeywords(res.keywords);
+          setMessage(null);
+        } else {
+          setKeywords(null);
+          setMessage(res.message);
+        }
       } catch {
         if (!cancelled) setMessage("Something went wrong. Is the backend running?");
       } finally {
@@ -59,7 +71,19 @@ export default function ResultsPage() {
         </div>
       </div>
 
-      {isPlaceholderMode ? (
+      {keywords && keywords.length > 0 ? (
+        <div className="results-grid">
+          <div className="glass-card glass-card--chart">
+            <div className="glass-card__header">
+              <div className="glass-card__label">Word cloud</div>
+              <div className="glass-card__chip">size = frequency • color = sentiment</div>
+            </div>
+            <div style={{ marginTop: "0.85rem" }}>
+              <WordBubbleCloud keywords={keywords} />
+            </div>
+          </div>
+        </div>
+      ) : isPlaceholderMode ? (
         <div className="results-grid">
           <div className="glass-card glass-card--metric">
             <div className="glass-card__label">Overall mood</div>
