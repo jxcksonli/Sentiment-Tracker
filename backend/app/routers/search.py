@@ -1,10 +1,12 @@
 from fastapi import APIRouter
-import httpx``
+import httpx
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 from app.models import (
     SearchRequest,
     SearchResponse,
     SentimentScore,
+    KeywordBubble,
 )
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -57,7 +59,63 @@ STOPWORDS = {
     "imho", "afaik", "brb", "btw", "ftw", "gg", "np", "thx", "ty",
     "yw", "afk", "bff", "cya", "gr8", "hbu", "jk", "k", "nvm", "sry", "w/", "w/o",}
 
-def extract_bubbles(comments: list[str]) -> list[str]:
+def extract_bubbles(comments: list[str], top_n: int = 10) -> list[str]:
     """
     Extract top keywords from comments, score each one, and return as a list of KeywordBubble Objects
     """
+    word_freq = {}
+    for comment in comments:
+        words = comment.lower().split() # Split comment into words and convert to lowercase
+        for word in words:
+            cleaned_word = ''.join(char for char in word if char.isalnum())
+            if cleaned_word and cleaned_word not in STOPWORDS: # Filter out stopwords and empty strings
+                word_freq[cleaned_word] = word_freq.get(cleaned_word, 0) + 1
+
+    sorted_words = sorted(word_freq.items(), key=lambda item: item[1], reverse=True) # Sort words by frequency
+    top_keywords = [word for word, freq in sorted_words[:top_n]]
+
+    bubbles = []
+    for keyword, count in top_keywords:
+        sentiment = calculate_sentiment_for_keyword(keyword, comments)
+        bubbles.append(KeywordBubble(keyword=keyword, count=count, sentiment=sentiment))
+
+    return bubbles
+
+analyser = SentimentIntensityAnalyzer()
+
+def calculate_sentiment_for_keyword(keyword: str, comments: list[str]) -> SentimentScore:
+    """
+    Calculate a sentiment score for a given keyword based on the comments it appears in.
+    """
+    scores = analyser.polarity_scores(keyword)
+    compound = scores["compound"]
+
+    if compound >= 0.05:
+        label = "positive"
+    elif compound <= -0.05:
+        label = "negative"
+    else:
+        label = "neutral"
+
+    return SentimentScore(score=round(compound, 3), label=label)
+
+def calculate_overall_sentiment(comments: list[str]) -> SentimentScore:
+    """
+    Calculate overall sentiment by averaging scores across all comments.
+    """
+
+    if not comments:
+        return SentimentScore(score=0.0, label="neutral")
+    
+    total_score = sum(b.count for b in comments)
+    weighted_score = sum(calculate_sentiment_for_keyword(b.keyword, comments).score * b.count for b in extract_bubbles(comments))
+    average_score = weighted_score / total_score if total_score > 0 else 0.
+
+    if average_score >= 0.05:
+        label = "positive"
+    elif average_score <= -0.05:
+        label = "negative"
+    else:
+        label = "neutral"
+
+    return SentimentScore(score=round(average_score, 3), label=label)
