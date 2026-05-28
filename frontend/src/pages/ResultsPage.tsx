@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { searchTopic, type KeywordBubble } from "../api";
+import { searchTopic, type BackendKeywordBubble, type KeywordBubble } from "../api";
 import WordBubbleCloud from "../components/WordBubbleCloud";
 
 export default function ResultsPage() {
@@ -41,6 +41,17 @@ export default function ResultsPage() {
 
         if ("keywords" in res) {
           setKeywords(res.keywords);
+          setMessage(null);
+        } else if ("bubbles" in res) {
+          const mapped: KeywordBubble[] = (res.bubbles as BackendKeywordBubble[]).map(
+            (b) => ({
+              word: b.keyword,
+              count: b.count,
+              sentiment: b.sentiment.label,
+              score: b.sentiment.score,
+            }),
+          );
+          setKeywords(mapped);
           setMessage(null);
         } else {
           setKeywords(null);
@@ -108,7 +119,7 @@ export default function ResultsPage() {
           <div className="glass-card glass-card--sources">
             <div className="glass-card__header">
               <div className="glass-card__label">Sources</div>
-              <div className="glass-card__chip">Reddit • more soon</div>
+              <div className="glass-card__chip">HackerNews</div>
             </div>
             <ul className="sources-skeleton" aria-hidden="true">
               <li />

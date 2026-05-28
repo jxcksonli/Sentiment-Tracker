@@ -1,33 +1,109 @@
 from __future__ import annotations
 
 import html
-import httpx
 
-from app.models import KeywordBubble, SentimentScore
+import httpx
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
+from app.models import KeywordBubble, SentimentScore
 
 _analyser = SentimentIntensityAnalyzer()
 
-# Stop words for sentiment analysis
+# Stop words for keyword extraction (HackerNews comments).
 STOPWORDS = {
-    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to",
-    "for", "of", "with", "is", "it", "this", "that", "was", "are",
-    "be", "as", "by", "from", "have", "has", "had", "not", "they",
-    "you", "we", "i", "he", "she", "its", "his", "her", "their",
-    "what", "which", "who", "will", "would", "could", "should",
-    "there", "been", "more", "also", "when", "about", "up", "out",
-    "lol", "lmao", "rofl", "omg", "wtf", "idk", "smh", "tbh", "fwiw",
-    "imho", "afaik", "brb", "btw", "ftw", "gg", "np", "thx", "ty",
-    "yw", "afk", "bff", "cya", "gr8", "hbu", "jk", "k", "nvm", "sry", "w/", "w/o",
+    "the",
+    "a",
+    "an",
+    "and",
+    "or",
+    "but",
+    "in",
+    "on",
+    "at",
+    "to",
+    "for",
+    "of",
+    "with",
+    "is",
+    "it",
+    "this",
+    "that",
+    "was",
+    "are",
+    "be",
+    "as",
+    "by",
+    "from",
+    "have",
+    "has",
+    "had",
+    "not",
+    "they",
+    "you",
+    "we",
+    "i",
+    "he",
+    "she",
+    "its",
+    "his",
+    "her",
+    "their",
+    "what",
+    "which",
+    "who",
+    "will",
+    "would",
+    "could",
+    "should",
+    "there",
+    "been",
+    "more",
+    "also",
+    "when",
+    "about",
+    "up",
+    "out",
+    "lol",
+    "lmao",
+    "rofl",
+    "omg",
+    "wtf",
+    "idk",
+    "smh",
+    "tbh",
+    "fwiw",
+    "imho",
+    "afaik",
+    "brb",
+    "btw",
+    "ftw",
+    "gg",
+    "np",
+    "thx",
+    "ty",
+    "yw",
+    "afk",
+    "bff",
+    "cya",
+    "gr8",
+    "hbu",
+    "jk",
+    "k",
+    "nvm",
+    "sry",
+    "w/",
+    "w/o",
     # Common extras that show up frequently in HN comments
-    "so", "if", "can", "your",
+    "so",
+    "if",
+    "can",
+    "your",
 }
+
 
 async def fetch_hn_comment_texts(topic: str, *, hits_per_page: int = 100) -> list[str]:
     """
-    Fetch comments from HackerNews via Algolia Search API.
-    Returns a list of comment texts strings.
+    Fetch comment text from HackerNews via the Algolia Search API.
 
     Endpoint:
       https://hn.algolia.com/api/v1/search?query=<topic>&tags=comment
@@ -42,16 +118,19 @@ async def fetch_hn_comment_texts(topic: str, *, hits_per_page: int = 100) -> lis
         response = await client.get(url, params=params)
         response.raise_for_status()
         data = response.json()
-        comments = [hit["comment_text"] for hit in data.get("hits", []) if hit.get("comment_text")]
-    return comments
+        return [
+            hit["comment_text"]
+            for hit in data.get("hits", [])
+            if hit.get("comment_text")
+        ]
 
 
-def tokenize(text: str) -> list[str]:
-    """Lowercase + split into words (clean punctuation)"""
+def tokenise(text: str) -> list[str]:
+    """Lowercase + split into words (clean punctuation)."""
     # HN comment_text often contains HTML entities like &#x27; for apostrophes.
-    # Unescape first so token cleaning doesn't produce tokens like "doesnx27t".
     text = html.unescape(text)
     words = text.lower().split()
+
     cleaned: list[str] = []
     for word in words:
         cleaned_word = "".join(char for char in word if char.isalnum())
@@ -59,8 +138,9 @@ def tokenize(text: str) -> list[str]:
             cleaned.append(cleaned_word)
     return cleaned
 
+
 def remove_stopwords(tokens: list[str]) -> list[str]:
-    """Remove common words like 'the', 'and', 'is', etc"""
+    """Remove common words like 'the', 'and', 'is', etc."""
     filtered: list[str] = []
     for t in tokens:
         if not t:
@@ -72,25 +152,27 @@ def remove_stopwords(tokens: list[str]) -> list[str]:
             continue
         if "x27" in t:
             continue
-        # Optional: drop tokens containing digits (often from entities or ids)
+        # Drop tokens containing digits (often from entities or ids)
         if any(ch.isdigit() for ch in t):
             continue
         filtered.append(t)
     return filtered
 
+
 def top_keywords(comment_texts: list[str], *, top_n: int = 60) -> list[tuple[str, int]]:
-    """Return top N (word, count) pairs"""
+    """Return top N (word, count) pairs."""
     word_freq: dict[str, int] = {}
     for comment in comment_texts:
-        tokens = remove_stopwords(tokenize(comment))
+        tokens = remove_stopwords(tokenise(comment))
         for token in tokens:
             word_freq[token] = word_freq.get(token, 0) + 1
 
     sorted_words = sorted(word_freq.items(), key=lambda item: item[1], reverse=True)
     return sorted_words[:top_n]
 
+
 def label_sentiment_for_word(word: str) -> SentimentScore:
-    """Return a SentimentScore for the word using VADER sentiment analysis"""
+    """Return a SentimentScore for the word using VADER sentiment analysis."""
     scores = _analyser.polarity_scores(word)
     compound = scores["compound"]
 
@@ -102,19 +184,19 @@ def label_sentiment_for_word(word: str) -> SentimentScore:
         label = "neutral"
     return SentimentScore(score=round(compound, 3), label=label)
 
-# Restored name from your original search.py (kept for familiarity)
+
 def calculate_sentiment_for_keyword(keyword: str, comments: list[str]) -> SentimentScore:
     """
-    Calculate a sentiment score for a given keyword based on the comments it appears in.
-    Maybe improve this later to consider the context around the keyword, but for now just score the keyword itself.
+    Calculate sentiment for a keyword.
+
+    Currently scores the keyword text itself (simple baseline).
     """
+    _ = comments  # reserved for future context-based scoring
     return label_sentiment_for_word(keyword)
 
 
 def extract_bubbles(comments: list[str], top_n: int = 10) -> list[KeywordBubble]:
-    """
-    Extract top keywords from comments, score each one, and return as KeywordBubble objects.
-    """
+    """Extract top keywords, score each one, and return KeywordBubble objects."""
     pairs = top_keywords(comments, top_n=top_n)
 
     bubbles: list[KeywordBubble] = []
@@ -124,17 +206,14 @@ def extract_bubbles(comments: list[str], top_n: int = 10) -> list[KeywordBubble]
 
     return bubbles
 
+
 def build_bubbles(comment_texts: list[str], *, top_n: int = 60) -> list[KeywordBubble]:
-    """
-    Build bubbles for the UI.
-    """
+    """Build bubbles for the UI."""
     return extract_bubbles(comment_texts, top_n=top_n)
 
 
 def calculate_overall_sentiment(bubbles: list[KeywordBubble]) -> SentimentScore:
-    """
-    Calculate overall sentiment by averaging bubble sentiment scores weighted by count.
-    """
+    """Calculate overall sentiment by averaging bubble sentiment scores weighted by count."""
     if not bubbles:
         return SentimentScore(score=0.0, label="neutral")
 
@@ -150,3 +229,4 @@ def calculate_overall_sentiment(bubbles: list[KeywordBubble]) -> SentimentScore:
         label = "neutral"
 
     return SentimentScore(score=round(average_score, 3), label=label)
+
