@@ -18,6 +18,7 @@ async def search_topic(body: SearchRequest) -> SearchResponse:
     """
     Run a full sentiment search for a topic.
     """
+    # This endpoint is the single entry point used by the UI results page.
     comment_texts = await fetch_hn_comment_texts(body.query)
     bubbles = build_bubbles(comment_texts)
     overall_sentiment = calculate_overall_sentiment(bubbles)

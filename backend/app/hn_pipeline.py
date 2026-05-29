@@ -108,6 +108,7 @@ async def fetch_hn_comment_texts(topic: str, *, hits_per_page: int = 100) -> lis
     Endpoint:
       https://hn.algolia.com/api/v1/search?query=<topic>&tags=comment
     """
+    # Keep this function small and predictable. It should only fetch and return text.
     url = "https://hn.algolia.com/api/v1/search"
     params = {
         "query": topic,
@@ -128,6 +129,7 @@ async def fetch_hn_comment_texts(topic: str, *, hits_per_page: int = 100) -> lis
 def tokenise(text: str) -> list[str]:
     """Lowercase + split into words (clean punctuation)."""
     # HN comment_text often contains HTML entities like &#x27; for apostrophes.
+    # Unescaping first avoids junk tokens like "doesnx27t".
     text = html.unescape(text)
     words = text.lower().split()
 
@@ -141,6 +143,7 @@ def tokenise(text: str) -> list[str]:
 
 def remove_stopwords(tokens: list[str]) -> list[str]:
     """Remove common words like 'the', 'and', 'is', etc."""
+    # This keeps the cloud meaningful by removing filler words and noisy tokens.
     filtered: list[str] = []
     for t in tokens:
         if not t:
@@ -161,6 +164,7 @@ def remove_stopwords(tokens: list[str]) -> list[str]:
 
 def top_keywords(comment_texts: list[str], *, top_n: int = 60) -> list[tuple[str, int]]:
     """Return top N (word, count) pairs."""
+    # The word cloud is driven entirely by these (word, count) pairs.
     word_freq: dict[str, int] = {}
     for comment in comment_texts:
         tokens = remove_stopwords(tokenise(comment))
@@ -173,6 +177,7 @@ def top_keywords(comment_texts: list[str], *, top_n: int = 60) -> list[tuple[str
 
 def label_sentiment_for_word(word: str) -> SentimentScore:
     """Return a SentimentScore for the word using VADER sentiment analysis."""
+    # Baseline approach: score the keyword itself. You can upgrade to context scoring later.
     scores = _analyser.polarity_scores(word)
     compound = scores["compound"]
 
@@ -191,12 +196,13 @@ def calculate_sentiment_for_keyword(keyword: str, comments: list[str]) -> Sentim
 
     Currently scores the keyword text itself (simple baseline).
     """
-    _ = comments  # reserved for future context-based scoring
+    _ = comments  # reserved for future context based scoring
     return label_sentiment_for_word(keyword)
 
 
 def extract_bubbles(comments: list[str], top_n: int = 10) -> list[KeywordBubble]:
     """Extract top keywords, score each one, and return KeywordBubble objects."""
+    # This is the core transformation from raw text into UI bubbles.
     pairs = top_keywords(comments, top_n=top_n)
 
     bubbles: list[KeywordBubble] = []
@@ -209,11 +215,13 @@ def extract_bubbles(comments: list[str], top_n: int = 10) -> list[KeywordBubble]
 
 def build_bubbles(comment_texts: list[str], *, top_n: int = 60) -> list[KeywordBubble]:
     """Build bubbles for the UI."""
+    # This function exists so the API endpoint has one call for bubble generation.
     return extract_bubbles(comment_texts, top_n=top_n)
 
 
 def calculate_overall_sentiment(bubbles: list[KeywordBubble]) -> SentimentScore:
     """Calculate overall sentiment by averaging bubble sentiment scores weighted by count."""
+    # This provides a single headline score for the topic.
     if not bubbles:
         return SentimentScore(score=0.0, label="neutral")
 
